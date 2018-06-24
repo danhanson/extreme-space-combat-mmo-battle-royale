@@ -45,7 +45,7 @@ class WebSocketServer(interface: String = "127.0.0.1", port: Int = 80, staticFil
     game
   }
 
-  private val socketFlow = Flow.fromFunction[HttpRequest, HttpResponse] {
+  private val httpFlow = Flow.fromFunction[HttpRequest, HttpResponse] {
     case req@HttpRequest(GET, Uri.Path(SocketPath(room, player)), _, _, _) =>
       req.header[UpgradeToWebSocket] match {
         case Some(upgrade) =>
@@ -61,7 +61,14 @@ class WebSocketServer(interface: String = "127.0.0.1", port: Int = 80, staticFil
       HttpResponse(404, entity = "Unknown Resource")
   }
 
+  private def cleanup(): Unit =
+    for(game <- games.values) {
+      game.terminate()
+    }
+
   def run(): Future[Http.ServerBinding] = {
-    Http().bind(interface, port).to(Sink.foreach(_.handleWith(socketFlow))).run()
+    val server = Http().bind(interface, port).to(Sink.foreach(_.handleWith(httpFlow))).run()
+    server.flatMap(_.whenTerminated).onComplete { _ => cleanup() }
+    server
   }
 }

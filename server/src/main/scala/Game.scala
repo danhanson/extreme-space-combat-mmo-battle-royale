@@ -35,11 +35,12 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
   private def removePlayer(player: Player): Unit = {
     player.destroy()
     globalQueue.offer(MessageFormat.notification(clock.instant(), s"${player.name} left the game"))
+    players.remove(player.name)
   }
 
   def join(playerId: String): Flow[ClientInput, ByteString, NotUsed] = {
     players.remove(playerId).foreach { player =>
-      player.destroy(new Error("Logged in somewhere else"))
+      player.destroy(new Error("Logged in somewhere else")) // XXX: reclaim player instead of respawning
     }
     val playerGeo = OdeHelper.createBox(level, 1, 1, 1)
     val playerBody = OdeHelper.createBody(world)
@@ -51,14 +52,13 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     playerGeo.setBody(playerBody)
     playerBody.setMass(playerMass)
     level.add(playerGeo)
-    playerBody.setLinearDampingThreshold(10) // implicitly sets max speed
     val (playerQueue, playerSource) = Source.queue[ByteString](1, OverflowStrategy.dropHead).preMaterialize()
     val player = Player(playerId, ClientInput(DVector3.ZERO, DVector3.ZERO), playerGeo, playerSpaceData, playerQueue)
     globalQueue.offer(MessageFormat.notification(clock.instant(), s"$playerId joined the game"))
     playerGeo.setData(player)
     players(playerId) = player
     val (done, sink) = Sink.foreach[ClientInput](player.input = _).preMaterialize()
-    done.onComplete(_ => player.destroy())
+    done.onComplete(_ => removePlayer(player))
     Flow.fromSinkAndSource(sink, playerSource.merge(globalSource))
   }
 
@@ -131,7 +131,25 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     interval = Some(materializer.schedulePeriodically(0.seconds, stepSize.seconds, () => step()))
   }
 
+  /**
+   * Stops the game, players are still connected and game can still resume
+   */
   def stop(): Unit = {
-    interval.map(_.cancel())
+    interval.foreach { ticker =>
+      ticker.cancel()
+      globalQueue.offer(MessageFormat.notification(clock.instant(), "Game Stopped"))
+    }
+    interval = None
+  }
+
+  /**
+   * Terminates the server, stopping the game and disconnecting the players
+   */
+  def terminate(): Unit = {
+    stop()
+    globalQueue.offer(MessageFormat.notification(clock.instant(), "Game Terminated"))
+    players.values.foreach(removePlayer)
+    globalQueue.complete()
+    world.destroy()
   }
 }

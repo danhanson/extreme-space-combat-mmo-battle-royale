@@ -5,7 +5,10 @@ version := "0.1"
 scalaVersion := "2.12.6"
 
 scalacOptions ++= Seq(
-  "-Ybreak-cycles"
+  "-Ybreak-cycles",
+  "-feature",
+  "-language:postfixOps",
+  "-deprecation"
 )
 
 libraryDependencies ++= Seq(
