@@ -3,12 +3,12 @@ import akka.http.scaladsl.model.ws.{BinaryMessage, Message, UpgradeToWebSocket}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
 import akka.http.scaladsl.model.HttpMethods.GET
+import akka.Done
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Sink}
 import akka.util.ByteString
-
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class WebSocketServer(interface: String, port: Int)(implicit actorSystem: ActorSystem, materializer: Materializer, executionContext: ExecutionContext) {
 
@@ -17,7 +17,7 @@ class WebSocketServer(interface: String, port: Int)(implicit actorSystem: ActorS
 
   private val parseInput = Flow.fromFunction[Message, ClientInput] {
     case BinaryMessage.Strict(data) => MessageFormat.readInput(data)
-    case BinaryMessage.Streamed(_) => throw new UnsupportedOperationException("No multi-fragment messages allowed") // impossible with js WebSocket api
+    case _ => throw new UnsupportedOperationException("Must be single fragment binary message")
   }
   private val formatOutput = Flow.fromFunction[ByteString, Message](BinaryMessage(_))
 
@@ -35,13 +35,13 @@ class WebSocketServer(interface: String, port: Int)(implicit actorSystem: ActorS
           val gameFlow = game.join(player)
           upgrade.handleMessages(parseInput.via(gameFlow).via(formatOutput))
         case None =>
-          HttpResponse(400, entity = "Expected WebSocket request")
+          HttpResponse(400, entity = "Expected WebSockets request")
       }
     case _ =>
       HttpResponse(404, entity = "Unknown Resource")
   }
 
-  def run() {
-    Http().bind(interface, port).runWith(Sink.foreach(_.handleWith(socketFlow)))
+  def run(): Future[Http.ServerBinding] = {
+    Http().bind(interface, port).to(Sink.foreach(_.handleWith(socketFlow))).run()
   }
 }
