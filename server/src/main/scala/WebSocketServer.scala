@@ -10,7 +10,7 @@ import akka.util.ByteString
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 
-class WebSocketServer(interface: String, port: Int)(implicit system: ActorSystem, materializer: Materializer, executionContext: ExecutionContext) {
+class WebSocketServer(interface: String, port: Int)(implicit actorSystem: ActorSystem, materializer: Materializer, executionContext: ExecutionContext) {
 
   private val Path = """(\w+)/(\w+)""".r
   private val games = mutable.Map.empty[String, Game]
@@ -41,7 +41,6 @@ class WebSocketServer(interface: String, port: Int)(implicit system: ActorSystem
       HttpResponse(404, entity = "Unknown Resource")
   }
 
-  Flow.fromSinkAndSource()
   def run() {
     Http().bind(interface, port).runWith(Sink.foreach(_.handleWith(socketFlow)))
   }

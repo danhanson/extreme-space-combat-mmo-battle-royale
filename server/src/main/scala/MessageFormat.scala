@@ -1,6 +1,6 @@
 import java.nio.{ByteBuffer, ByteOrder}
 import java.nio.charset.StandardCharsets
-
+import java.time.Instant
 import akka.util.ByteString
 import org.ode4j.math.{DQuaternionC, DVector3, DVector3C}
 
@@ -37,10 +37,10 @@ object MessageFormat {
       buf.putDouble(quat.get(i))
     }
 
-  def clientUpdate(tickTime: Long, entities: TraversableOnce[EntityData]): ByteString = {
+  def clientUpdate(tickTime: Instant, entities: TraversableOnce[EntityData]): ByteString = {
     val buf = ByteBuffer.allocate(TIME_LENTH + MESSAGE_TYPE_LENGTH + ENTITY_SIZE * entities.size)
     buf.order(ByteOrder.BIG_ENDIAN)
-    buf.putLong(tickTime)
+    buf.putLong(tickTime.toEpochMilli)
     buf.put(UPDATE)
     for(EntityData(entity, body) <- entities) {
       buf.put(entity.id)
@@ -52,10 +52,10 @@ object MessageFormat {
     ByteString.fromArrayUnsafe(buf.array())
   }
 
-  def notification(time: Long, text: String): ByteString = {
+  def notification(time: Instant, text: String): ByteString = {
     val buf = ByteBuffer.allocate(TIME_LENTH + MESSAGE_TYPE_LENGTH)
     buf.order(ByteOrder.BIG_ENDIAN)
-    buf.putLong(time)
+    buf.putLong(time.toEpochMilli)
     buf.put(NOTIFY)
     ByteString(buf.array()) ++ ByteString(text, StandardCharsets.UTF_8)
   }

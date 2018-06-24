@@ -20,7 +20,7 @@ case class Player(
     */
   def destroy(excOpt: Option[Throwable]): Unit = {
     playerShape.getBody.destroy()
-    excOpt.fold(queue.complete(), queue.fail _)
+    excOpt.fold(queue.complete())(queue.fail _)
   }
 
   /**

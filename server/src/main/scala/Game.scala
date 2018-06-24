@@ -5,13 +5,14 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.ByteString
 import org.ode4j.math.{DQuaternion, DQuaternionC, DVector3, DVector3C}
 import org.ode4j.ode.{DContactBuffer, DGeom, DJointGroup, OdeHelper}
-
+import java.time.{Instant, Clock}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 class Game(name: String)(implicit executionContext: ExecutionContext, materializer: Materializer) {
 
+  private val clock = Clock.systemUTC()
   private val (globalQueue, globalSource) = Source.queue[ByteString](5, OverflowStrategy.fail).preMaterialize()
   private var interval: Option[Cancellable] = None
   private var tickTime: Option[Long] = None
@@ -33,14 +34,14 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
 
   private def removePlayer(player: Player): Unit = {
     player.destroy()
-    globalQueue.offer(MessageFormat.notification(s"${player.name} left the game"))
+    globalQueue.offer(MessageFormat.notification(clock.instant(), s"${player.name} left the game"))
   }
 
   def join(playerId: String): Flow[ClientInput, ByteString, NotUsed] = {
     players.remove(playerId).foreach { player =>
       player.destroy(new Error("Logged in somewhere else"))
     }
-    val playerGeo = OdeHelper.createBox(1, 1, 1)
+    val playerGeo = OdeHelper.createBox(level, 1, 1, 1)
     val playerBody = OdeHelper.createBody(world)
     val playerSpace = OdeHelper.createSimpleSpace(level)
     val spaceSphere = OdeHelper.createSphere(playerSpace, 150)
@@ -53,7 +54,7 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     playerBody.setLinearDampingThreshold(10) // implicitly sets max speed
     val (playerQueue, playerSource) = Source.queue[ByteString](1, OverflowStrategy.dropHead).preMaterialize()
     val player = Player(playerId, ClientInput(DVector3.ZERO, DVector3.ZERO), playerGeo, playerSpaceData, playerQueue)
-    globalQueue.offer(MessageFormat.notification(s"$playerId joined the game"))
+    globalQueue.offer(MessageFormat.notification(clock.instant(), s"$playerId joined the game"))
     playerGeo.setData(player)
     players(playerId) = player
     val (done, sink) = Sink.foreach[ClientInput](player.input = _).preMaterialize()
@@ -107,9 +108,9 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
   }
 
   // after each tick, send updates to the players
-  def sendUpdates(): Unit = { // enqueue the messages to the clients
+  def sendUpdates(instant: Instant): Unit = { // enqueue the messages to the clients
     for(player <- players.values) {
-      player.queue.offer(MessageFormat.clientUpdate(player.playerSpace.entities))
+      player.queue.offer(MessageFormat.clientUpdate(instant, player.playerSpace.entities))
     }
   }
 
@@ -121,8 +122,9 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
       handleEncounter(data.asInstanceOf[DJointGroup], e1, e2)
     })
     world.quickStep(stepSize)
+    val instant = clock.instant()
     contactGroup.empty()
-    sendUpdates()
+    sendUpdates(instant)
   }
 
   def start(): Unit = {
