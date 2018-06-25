@@ -1,3 +1,5 @@
+package server
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, UpgradeToWebSocket}
 import akka.http.scaladsl.Http
@@ -17,16 +19,25 @@ class WebSocketServer(interface: String = "127.0.0.1", port: Int = 80, staticFil
   def this(interface: String, port: Int, staticFiles: Path)(implicit actorSystem: ActorSystem, materializer: Materializer, executionContext: ExecutionContext) =
     this(interface, port, Some(staticFiles))
 
-  private val rootOpt = staticFiles.map(_.normalize().toAbsolutePath())
-  private val SocketPath = """/socket/(\w+)/(\w+)""".r
+  private val rootOpt = staticFiles.map(_.normalize())
+  private val SocketPath = """/socket/([^/]+)/([^/]+)""".r
   private val games = mutable.Map.empty[String, Game]
   private val contentTypeResolver = ContentTypeResolver.Default
 
   object FilePath {
     def unapply(path: String): Option[Path] = rootOpt.flatMap { root =>
-      val filePath = root.resolve(path.tail).normalize()
-      if(filePath.startsWith(root) && Files.isRegularFile(filePath)) {
-        Some(filePath)
+      val resolvedPath = root.resolve(path.tail).normalize()
+      if(resolvedPath.startsWith(root)) {
+        val filePath = if(Files.isDirectory(resolvedPath)) {
+          resolvedPath.resolve("index.html")
+        } else {
+          resolvedPath
+        }
+        if(Files.isRegularFile(filePath)) {
+          Some(filePath)
+        } else {
+          None
+        }
       } else {
         None
       }
@@ -56,6 +67,7 @@ class WebSocketServer(interface: String = "127.0.0.1", port: Int = 80, staticFil
           HttpResponse(400, entity = "Expected WebSockets request")
       }
     case HttpRequest(GET, Uri.Path(FilePath(file)), _, _, _) =>
+      println(file)
       HttpResponse(200, entity = HttpEntity.fromPath(contentTypeResolver(file.toString), file))
     case _ =>
       HttpResponse(404, entity = "Unknown Resource")

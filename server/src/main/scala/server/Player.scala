@@ -1,3 +1,5 @@
+package server
+
 import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.util.ByteString
 import org.ode4j.ode.DGeom

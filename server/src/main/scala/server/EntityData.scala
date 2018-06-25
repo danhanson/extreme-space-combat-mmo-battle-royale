@@ -1,3 +1,5 @@
+package server
+
 import org.ode4j.ode.DBody
 
 case class EntityData(

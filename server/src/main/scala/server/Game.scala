@@ -1,3 +1,5 @@
+package server
+
 import akka.NotUsed
 import akka.actor.Cancellable
 import akka.stream.{Materializer, OverflowStrategy}
@@ -23,7 +25,7 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
   private val players = mutable.Map.empty[String, Player]
   private val playerMass = {
     val mass = OdeHelper.createMass()
-    mass.setMass(150)
+    mass.setBoxTotal(150, 1, 1, 1)
     mass
   }
   private val maxForce = 3

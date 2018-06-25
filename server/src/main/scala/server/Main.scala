@@ -1,3 +1,5 @@
+package server
+
 import scala.concurrent.ExecutionContext
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.actor.{ActorSystem, Cancellable}

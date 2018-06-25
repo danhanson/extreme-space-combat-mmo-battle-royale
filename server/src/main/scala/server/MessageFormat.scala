@@ -1,3 +1,5 @@
+package server
+
 import java.nio.{ByteBuffer, ByteOrder}
 import java.nio.charset.StandardCharsets
 import java.time.Instant

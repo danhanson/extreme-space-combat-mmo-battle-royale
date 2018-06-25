@@ -106,7 +106,13 @@ const frames = Kefir.stream(emitter => {
   requestAnimationFrame(doFrame)
 })
 
-const ws = new WebSocket(`wss://danhanson.us/space-game-2/${game}/${name}`)
+function getWebSocket (game, name) {
+  const proto = (location.protocol === 'http:') ? 'ws:' : 'wss:'
+  const ws = new WebSocket(`${proto}//${location.host}/socket/${game}/${name}`)
+  return ws
+}
+
+const ws = getWebSocket(game, name)
 const updates = Kefir.fromEvents(ws, 'message')
 const ticks = updates.scan(applyUpdate, initialWorld())
 
@@ -159,3 +165,5 @@ const scenes = Kefir.combine({ world: sceneFrames }, { camera: camera })
   .scan(updateScene, { meshes: new Map(), scene: new Three.Scene() })
 
 scenes.onValue(render)
+
+document.body.appendChild(renderer.domElement)
