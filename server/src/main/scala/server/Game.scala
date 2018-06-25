@@ -11,18 +11,32 @@ import java.time.{Instant, Clock}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import com.typesafe.scalalogging.StrictLogging
 
-class Game(name: String)(implicit executionContext: ExecutionContext, materializer: Materializer) {
+class Game(name: String)(implicit executionContext: ExecutionContext, materializer: Materializer) extends StrictLogging {
 
+  // clock used for getting message times
   private val clock = Clock.systemUTC()
+
+  // queue and source for global notifications
   private val (globalQueue, globalSource) = Source.queue[ByteString](5, OverflowStrategy.fail).preMaterialize()
+
+  // geoms waiting to join the next tick
+  private val pendingGeoms = mutable.Buffer.empty[DGeom]
+
+  // interval for tick computing
   private var interval: Option[Cancellable] = None
-  private var tickTime: Option[Long] = None
+
+  // length of time per tick
   val stepSize: Double = 1.0 / 30.0 // 30 ticks per second
 
+  logger.debug("Constructing World")
   private val world = OdeHelper.createWorld()
+  world.setTaskExecutor(new GameTaskExecutor(executionContext, 1))
   private val level  = OdeHelper.createHashSpace()
   private val players = mutable.Map.empty[String, Player]
+
+  // all players have the same mass
   private val playerMass = {
     val mass = OdeHelper.createMass()
     mass.setBoxTotal(150, 1, 1, 1)
@@ -33,9 +47,11 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
   private val plane = OdeHelper.createPlane(level, 0, 0, 1, 0) // place ground at z = 0
 
   world.setGravity(0, 0, -9.8)
+  logger.debug("World Constructed")
 
   private def removePlayer(player: Player): Unit = {
     player.destroy()
+    logger.info(s"${player.name} removed from game $name")
     globalQueue.offer(MessageFormat.notification(clock.instant(), s"${player.name} left the game"))
     players.remove(player.name)
   }
@@ -44,21 +60,24 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     players.remove(playerId).foreach { player =>
       player.destroy(new Error("Logged in somewhere else")) // XXX: reclaim player instead of respawning
     }
-    val playerGeo = OdeHelper.createBox(level, 1, 1, 1)
+    logger.info(s"$playerId joining game $name")
+    logger.debug(s"adding player entity $playerId to world")
+    val playerGeom = OdeHelper.createBox(1, 1, 1)
     val playerBody = OdeHelper.createBody(world)
-    val playerSpace = OdeHelper.createSimpleSpace(level)
-    val spaceSphere = OdeHelper.createSphere(playerSpace, 150)
+    val spaceSphere = OdeHelper.createSphere(150)
     val playerSpaceData = PlayerSpace(mutable.Buffer.empty)
     spaceSphere.setData(playerSpaceData)
-    playerSpace.setBody(playerBody)
-    playerGeo.setBody(playerBody)
+    spaceSphere.setBody(playerBody)
+    playerGeom.setBody(playerBody)
     playerBody.setMass(playerMass)
-    level.add(playerGeo)
+    pendingGeoms += playerGeom += spaceSphere
     val (playerQueue, playerSource) = Source.queue[ByteString](1, OverflowStrategy.dropHead).preMaterialize()
-    val player = Player(playerId, ClientInput(DVector3.ZERO, DVector3.ZERO), playerGeo, playerSpaceData, playerQueue)
+    val player = Player(playerId, ClientInput(DVector3.ZERO, DVector3.ZERO), playerGeom, playerSpaceData, playerQueue)
+    playerSpaceData.entities += player.toEntityData
     globalQueue.offer(MessageFormat.notification(clock.instant(), s"$playerId joined the game"))
-    playerGeo.setData(player)
+    playerGeom.setData(player)
     players(playerId) = player
+    logger.debug(s"player entity $playerId added to world")
     val (done, sink) = Sink.foreach[ClientInput](player.input = _).preMaterialize()
     done.onComplete(_ => removePlayer(player))
     Flow.fromSinkAndSource(sink, playerSource.merge(globalSource))
@@ -116,20 +135,28 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     }
   }
 
-  def step(): Unit = { // rewrite this to do collisions and updates all at once
+  def step(): Unit = {
+    pendingGeoms.foreach(level.add(_))
+    pendingGeoms.clear()
+    logger.trace(s"$name: computing next tick")
     applyInputs()
+    logger.trace(s"$name: applying player inputs")
     clearSpaces()
     val contactGroup = OdeHelper.createJointGroup()
+    logger.trace(s"$name: applying step")
     level.collide(contactGroup, { (data, e1, e2) =>
       handleEncounter(data.asInstanceOf[DJointGroup], e1, e2)
     })
     world.quickStep(stepSize)
     val instant = clock.instant()
     contactGroup.empty()
+    logger.trace(s"$name: next tick computed")
+    logger.trace(s"$name: broadcasting world updates")
     sendUpdates(instant)
   }
 
   def start(): Unit = {
+    logger.info(s"$name: started")
     interval = Some(materializer.schedulePeriodically(0.seconds, stepSize.seconds, () => step()))
   }
 
@@ -139,6 +166,7 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
   def stop(): Unit = {
     interval.foreach { ticker =>
       ticker.cancel()
+      logger.info(s"$name: stopped")
       globalQueue.offer(MessageFormat.notification(clock.instant(), "Game Stopped"))
     }
     interval = None
@@ -149,9 +177,14 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
    */
   def terminate(): Unit = {
     stop()
+    logger.debug(s"$name: terminating")
+    logger.debug(s"$name: broadcasting termination notification")
     globalQueue.offer(MessageFormat.notification(clock.instant(), "Game Terminated"))
+    logger.debug(s"$name: removing all players")
     players.values.foreach(removePlayer)
     globalQueue.complete()
+    logger.debug(s"$name: destroying world")
     world.destroy()
+    logger.info(s"$name: terminated")
   }
 }

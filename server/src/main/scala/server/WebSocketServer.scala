@@ -13,8 +13,9 @@ import akka.http.scaladsl.server.directives.ContentTypeResolver
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import java.nio.file.{Files, Path}
+import com.typesafe.scalalogging.StrictLogging
 
-class WebSocketServer(interface: String = "127.0.0.1", port: Int = 80, staticFiles: Option[Path] = None)(implicit actorSystem: ActorSystem, materializer: Materializer, executionContext: ExecutionContext) {
+class WebSocketServer(interface: String = "127.0.0.1", port: Int = 80, staticFiles: Option[Path] = None)(implicit actorSystem: ActorSystem, materializer: Materializer, executionContext: ExecutionContext) extends StrictLogging {
 
   def this(interface: String, port: Int, staticFiles: Path)(implicit actorSystem: ActorSystem, materializer: Materializer, executionContext: ExecutionContext) =
     this(interface, port, Some(staticFiles))
@@ -60,14 +61,16 @@ class WebSocketServer(interface: String = "127.0.0.1", port: Int = 80, staticFil
     case req@HttpRequest(GET, Uri.Path(SocketPath(room, player)), _, _, _) =>
       req.header[UpgradeToWebSocket] match {
         case Some(upgrade) =>
+          logger.debug(req.toString)
           val game = games.getOrElseUpdate(room, initializeGame(room))
           val gameFlow = game.join(player)
           upgrade.handleMessages(parseInput.via(gameFlow).via(formatOutput))
         case None =>
+          logger.debug(req.toString)
           HttpResponse(400, entity = "Expected WebSockets request")
       }
-    case HttpRequest(GET, Uri.Path(FilePath(file)), _, _, _) =>
-      println(file)
+    case req@HttpRequest(GET, Uri.Path(FilePath(file)), _, _, _) =>
+      logger.debug(req.toString)
       HttpResponse(200, entity = HttpEntity.fromPath(contentTypeResolver(file.toString), file))
     case _ =>
       HttpResponse(404, entity = "Unknown Resource")

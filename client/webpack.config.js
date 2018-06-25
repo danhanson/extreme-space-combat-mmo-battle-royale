@@ -17,6 +17,10 @@ module.exports = (env, { mode = 'development' }) => {
     }),
     new webpack.DefinePlugin({
       'precess.env.NODE_ENV': mode
+    }),
+    new MiniCssExtractPlugin({
+      filename: '[name].css',
+      chunkFilename: '[id].css'
     })
   ]
   if (mode === 'production') {
@@ -42,11 +46,7 @@ module.exports = (env, { mode = 'development' }) => {
               loader: MiniCssExtractPlugin.loader
             },
             {
-              loader: 'css-loader',
-              options: {
-                sourceMap: true,
-                importLoaders: 1
-              }
+              loader: 'css-loader'
             },
             {
               loader: 'stylus-loader'

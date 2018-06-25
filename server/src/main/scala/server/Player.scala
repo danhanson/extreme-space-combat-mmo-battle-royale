@@ -21,7 +21,7 @@ case class Player(
     * @param excOpt
     */
   def destroy(excOpt: Option[Throwable]): Unit = {
-    playerShape.getBody.destroy()
+    Option(playerShape.getBody).map(_.destroy())
     excOpt.fold(queue.complete())(queue.fail _)
   }
 

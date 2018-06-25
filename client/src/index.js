@@ -3,6 +3,7 @@ import * as Three from 'three'
 import Entity from './entity'
 import Player from './player'
 import Kefir from 'kefir'
+import './main.styl'
 
 let game = prompt('Enter the game you want to join: ')
 let name = prompt('Enter You Name: ')

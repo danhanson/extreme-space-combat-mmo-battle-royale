@@ -6,8 +6,9 @@ import akka.actor.{ActorSystem, Cancellable}
 import akka.http.scaladsl.Http
 import java.nio.file.Paths
 import scala.concurrent.duration._
+import com.typesafe.scalalogging.StrictLogging
 
-object Main extends App {
+object Main extends App with StrictLogging {
   implicit val actorSystem: ActorSystem = ActorSystem("SPACE-GAME-2")
 
   def checkForNewline(): Boolean =
@@ -21,10 +22,12 @@ object Main extends App {
       }
 
   def pollConsole(binding: Http.ServerBinding, poll: Cancellable): Unit = {
+    logger.trace("Poll console")
     if(checkForNewline()) {
       poll.cancel()
       println("Shutting down server")
       binding.terminate(5 seconds).onComplete { _ =>
+        logger.debug("Terminating ActorSystem")
         actorSystem.terminate()
       }
     }
