@@ -1,19 +1,27 @@
 package server
 
-import akka.NotUsed
+import akka.{NotUsed, Done}
 import akka.actor.Cancellable
-import akka.stream.{Materializer, OverflowStrategy}
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream._
+import akka.stream.scaladsl._
 import akka.util.ByteString
-import org.ode4j.math.{DQuaternion, DQuaternionC, DVector3, DVector3C}
-import org.ode4j.ode.{DContactBuffer, DGeom, DJointGroup, OdeHelper}
-import java.time.{Instant, Clock}
+import org.ode4j.math._
+import org.ode4j.ode._
+import java.time._
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext
+import scala.concurrent._
 import scala.concurrent.duration._
 import com.typesafe.scalalogging.StrictLogging
 
 class Game(name: String)(implicit executionContext: ExecutionContext, materializer: Materializer) extends StrictLogging {
+
+  private val terminationPromise = Promise[Done]()
+
+  val GROUND = 1
+  val PLAYER = 2
+  val PLAYER_SPACE = 4
+
+  def whenTerminated: Future[Done] = terminationPromise.future
 
   // clock used for getting message times
   private val clock = Clock.systemUTC()
@@ -21,8 +29,8 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
   // queue and source for global notifications
   private val (globalQueue, globalSource) = Source.queue[ByteString](5, OverflowStrategy.fail).preMaterialize()
 
-  // geoms waiting to join the next tick
-  private val pendingGeoms = mutable.Buffer.empty[DGeom]
+  // tasks waiting to run for the next tick
+  private val pendingTasks = mutable.Buffer.empty[() => Any]
 
   // interval for tick computing
   private var interval: Option[Cancellable] = None
@@ -45,15 +53,24 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
   private val maxForce = 3
   private val maxTorque = 1
   private val plane = OdeHelper.createPlane(level, 0, 0, 1, 0) // place ground at z = 0
+  plane.setCategoryBits(GROUND)
 
   world.setGravity(0, 0, -9.8)
   logger.debug("World Constructed")
 
-  private def removePlayer(player: Player): Unit = {
-    player.destroy()
-    logger.info(s"${player.name} removed from game $name")
+  private def removePlayer(player: Player, autoterminate: Boolean = true): Unit = {
+    if(!players.contains(player.name)) {
+      logger.debug(s"$name: ${player.name} already removed")
+      return
+    }
+    pendingTasks += { () => player.destroy() }
+    logger.info(s"$name: ${player.name} removed from game")
     globalQueue.offer(MessageFormat.notification(clock.instant(), s"${player.name} left the game"))
     players.remove(player.name)
+    if(autoterminate && players.size == 0) {
+      logger.info(s"$name: all players left game, terminating")
+      terminate()
+    }
   }
 
   def join(playerId: String): Flow[ClientInput, ByteString, NotUsed] = {
@@ -66,11 +83,15 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     val playerBody = OdeHelper.createBody(world)
     val spaceSphere = OdeHelper.createSphere(150)
     val playerSpaceData = PlayerSpace(mutable.Buffer.empty)
+    spaceSphere.setCategoryBits(PLAYER_SPACE)
+    spaceSphere.setCollideBits(PLAYER)
     spaceSphere.setData(playerSpaceData)
     spaceSphere.setBody(playerBody)
+    playerGeom.setCategoryBits(PLAYER)
+    playerGeom.setCollideBits(PLAYER | GROUND)
     playerGeom.setBody(playerBody)
     playerBody.setMass(playerMass)
-    pendingGeoms += playerGeom += spaceSphere
+    pendingTasks += { () => level.add(playerGeom) } += { () => level.add(spaceSphere) }
     val (playerQueue, playerSource) = Source.queue[ByteString](1, OverflowStrategy.dropHead).preMaterialize()
     val player = Player(playerId, ClientInput(DVector3.ZERO, DVector3.ZERO), playerGeom, playerSpaceData, playerQueue)
     playerSpaceData.entities += player.toEntityData
@@ -136,8 +157,8 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
   }
 
   def step(): Unit = {
-    pendingGeoms.foreach(level.add(_))
-    pendingGeoms.clear()
+    pendingTasks.foreach(_.apply())
+    pendingTasks.clear()
     logger.trace(s"$name: computing next tick")
     applyInputs()
     logger.trace(s"$name: applying player inputs")
@@ -181,10 +202,11 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     logger.debug(s"$name: broadcasting termination notification")
     globalQueue.offer(MessageFormat.notification(clock.instant(), "Game Terminated"))
     logger.debug(s"$name: removing all players")
-    players.values.foreach(removePlayer)
+    players.values.foreach(removePlayer(_, false))
     globalQueue.complete()
     logger.debug(s"$name: destroying world")
     world.destroy()
     logger.info(s"$name: terminated")
+    terminationPromise.success(Done)
   }
 }

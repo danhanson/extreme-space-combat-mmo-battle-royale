@@ -51,28 +51,32 @@ class WebSocketServer(interface: String = "127.0.0.1", port: Int = 80, staticFil
   }
   private val formatOutput = Flow.fromFunction[ByteString, Message](BinaryMessage(_))
 
-  private def initializeGame(name: String): Game = {
-    val game = new Game(name)
-    game.start()
-    game
+  private def getGame(name: String): Game = {
+    games.getOrElseUpdate(name, {
+      val game = new Game(name)
+      game.whenTerminated.onComplete(_ => games -= name)
+      game.start()
+      game
+    })
   }
 
   private val httpFlow = Flow.fromFunction[HttpRequest, HttpResponse] {
     case req@HttpRequest(GET, Uri.Path(SocketPath(room, player)), _, _, _) =>
       req.header[UpgradeToWebSocket] match {
         case Some(upgrade) =>
-          logger.debug(req.toString)
-          val game = games.getOrElseUpdate(room, initializeGame(room))
+          logger.debug(req.uri.toString)
+          val game = getGame(room)
           val gameFlow = game.join(player)
           upgrade.handleMessages(parseInput.via(gameFlow).via(formatOutput))
         case None =>
-          logger.debug(req.toString)
+          logger.debug(req.uri.toString)
           HttpResponse(400, entity = "Expected WebSockets request")
       }
     case req@HttpRequest(GET, Uri.Path(FilePath(file)), _, _, _) =>
-      logger.debug(req.toString)
+      logger.debug(req.uri.toString)
       HttpResponse(200, entity = HttpEntity.fromPath(contentTypeResolver(file.toString), file))
-    case _ =>
+    case req =>
+      logger.debug(req.uri.toString)
       HttpResponse(404, entity = "Unknown Resource")
   }
 

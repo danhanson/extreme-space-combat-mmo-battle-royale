@@ -7,8 +7,12 @@ import akka.http.scaladsl.Http
 import java.nio.file.Paths
 import scala.concurrent.duration._
 import com.typesafe.scalalogging.StrictLogging
+import org.ode4j.ode.OdeHelper
 
 object Main extends App with StrictLogging {
+
+  OdeHelper.initODE()
+
   implicit val actorSystem: ActorSystem = ActorSystem("SPACE-GAME-2")
 
   def checkForNewline(): Boolean =

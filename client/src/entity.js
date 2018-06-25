@@ -8,7 +8,7 @@ export default class Entity {
     return new Three.MeshBasicMaterial({ color: 0x538EED })
   }
   static get size () {
-    return 1 + (3 * 3 + 4) * 64
+    return 1 + (3 * 3 + 4) * 8
   }
   constructor (position = new Three.Vector3(0, 0, 0), quaternion = new Three.Quaternion(0, 0, 0, 1), velocity = new Three.Vector3(0, 0, 0), rotation = new Three.Quaternion(0, 0, 0, 1)) {
     this.position = position
@@ -18,13 +18,13 @@ export default class Entity {
   }
 
   extrapolate (delta) {
-    const position = this.position.clone().add(this.linearVelocity.clone().multiplyScalar(delta))
+    const position = this.position.clone().add(this.velocity.clone().multiplyScalar(delta))
     const quaternion = this.quaternion.clone()
     while (delta > 1) {
-      quaternion.multiply(this.angularVelocity)
+      quaternion.multiply(this.rotation)
       delta -= 1
     }
-    quaternion.slerp(this.angularVelocity.clone().multiply(this.mesh.quaternion), delta)
+    quaternion.slerp(this.rotation.clone().multiply(quaternion), delta)
     return new this.constructor(position, quaternion, this.velocity, this.rotation)
   }
 }

@@ -8,6 +8,12 @@ import './main.styl'
 let game = prompt('Enter the game you want to join: ')
 let name = prompt('Enter You Name: ')
 
+function meshMap () {
+  const meshes = new Map()
+  meshes.set(Player, [])
+  return meshes
+}
+
 function * getDoubles (dataView, i) {
   yield dataView.getFloat64(i)
   i += 8
@@ -34,9 +40,19 @@ function getQuaternion (doubles) {
   )
 }
 
+function getQuatFromEuler (doubles) {
+  const quat = new Three.Quaternion()
+  quat.setFromEuler(new Three.Euler(
+    doubles.next().value,
+    doubles.next().value,
+    doubles.next().value
+  ))
+  return quat
+}
+
 function applyUpdate (world, message) {
-  const messageBuf = new DataView(message.data)
-  const time = new Date(messageBuf.getUint64(0))
+  const messageBuf = new DataView(message)
+  const time = new Date(Number(messageBuf.getBigUint64(0)))
   switch (messageBuf.getUint8(8)) {
     case 0: // text notification
       const decoder = new TextDecoder('utf-8')
@@ -48,7 +64,7 @@ function applyUpdate (world, message) {
     case 1: // world update
       const entities = []
       for (let i = 9; i < messageBuf.byteLength; i += Entity.size) {
-        let entityView = new DataView(messageBuf, i, Entity.size)
+        let entityView = new DataView(message, i, Entity.size)
         let entityConstructor = entityConstructors[entityView.getUint8(i)]
         let doubles = getDoubles(entityView, i + 1)
         entities.push(
@@ -56,7 +72,7 @@ function applyUpdate (world, message) {
             getVector(doubles),
             getQuaternion(doubles),
             getVector(doubles),
-            getVector(doubles)
+            getQuatFromEuler(doubles)
           )
         )
       }
@@ -86,22 +102,27 @@ function initialWorld () {
   }
 }
 
+const camera = new Three.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 15000)
+camera.position.z = 300
 const renderer = new Three.WebGLRenderer({
   antialias: true
 })
 renderer.setSize(window.innerWidth, window.innerHeight)
+renderer.setPixelRatio(window.devicePixelRatio)
+
 document.body.appendChild(renderer.domElement)
 
-const resize = Kefir.fromEvents(window, 'resize').map(evt => evt.target)
-const camera = resize.map(
-  ({ innerWidth, innerHeight }) => new Three.PerspectiveCamera(70, innerWidth / innerHeight, 0.01, 150)
+window.addEventListener('resize',
+  ({ target: { innerWidth, innerHeight } }) => {
+    renderer.resize(innerWidth, innerHeight)
+    camera.aspect = innerWidth / innerHeight
+    camera.updateProjectionMatrix()
+  }
 )
-resize.onValue(
-  ({ innerWidth, innerHeight }) => renderer.resize(innerWidth, innerHeight)
-)
+
 const frames = Kefir.stream(emitter => {
   function doFrame () {
-    emitter(new Date())
+    emitter.emit(new Date())
     requestAnimationFrame(doFrame)
   }
   requestAnimationFrame(doFrame)
@@ -113,8 +134,14 @@ function getWebSocket (game, name) {
   return ws
 }
 
-const ws = getWebSocket(game, name)
-const updates = Kefir.fromEvents(ws, 'message')
+const updates = Kefir.stream(emitter => {
+  const ws = getWebSocket(game, name)
+  ws.addEventListener('message', evt => {
+    const reader = new FileReader()
+    reader.onload = evt => emitter.emit(evt.target.result)
+    return reader.readAsArrayBuffer(evt.data)
+  })
+})
 const ticks = updates.scan(applyUpdate, initialWorld())
 
 function addMesh (scene, mesh) {
@@ -122,34 +149,32 @@ function addMesh (scene, mesh) {
   return mesh
 }
 
-function updateScene ({ entities, camera }, { meshes, scene }) {
-  const newMeshes = new Map()
+function updateScene ({ meshes, scene }, { entities }) {
+  const newMeshes = meshMap()
 
   // adjust meshes based on entities, it doesn't matter if a mesh changes entities as long as
   // the entity type doesn't change
   for (let { position, quaternion, constructor, geometry, material } of entities) {
     let mesh = meshes.get(constructor).pop() || addMesh(scene, new Three.Mesh(geometry, material))
-    mesh.position = position
-    mesh.quaternion = quaternion
-    if (!newMeshes.has(constructor)) {
-      newMeshes.set(constructor, [])
-    }
+    mesh.position.copy(position)
+    mesh.quaternion.copy(quaternion)
     newMeshes.get(constructor).push(mesh)
   }
   // remove remaining garbage meshes
-  for (let meshList of meshes.values) {
+  for (let meshList of meshes.values()) {
     for (let mesh of meshList) {
       scene.remove(mesh)
     }
   }
   return {
     scene,
+    camera,
     meshes: newMeshes
   }
 }
 
 function extrapolate (frameTime, world) {
-  const delta = frameTime - world.lastUpdated
+  const delta = (frameTime - world.lastUpdated) / 1000
   return {
     ...world,
     entities: world.entities.map(e => e.extrapolate(delta))
@@ -157,13 +182,13 @@ function extrapolate (frameTime, world) {
 }
 
 function render ({ scene, camera }) {
-  renderer.render(scene, camera)
+  if (camera) {
+    renderer.render(scene, camera)
+  }
 }
 
-// not sure I have to update or can create a scene each frame
 const sceneFrames = Kefir.combine([frames], [ticks], extrapolate)
-const scenes = Kefir.combine({ world: sceneFrames }, { camera: camera })
-  .scan(updateScene, { meshes: new Map(), scene: new Three.Scene() })
+const scenes = sceneFrames.scan(updateScene, { meshes: meshMap(), scene: new Three.Scene() })
 
 scenes.onValue(render)
 
