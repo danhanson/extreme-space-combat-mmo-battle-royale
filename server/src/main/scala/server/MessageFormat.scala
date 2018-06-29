@@ -11,32 +11,31 @@ object MessageFormat {
   def TIME_LENTH: Int = java.lang.Long.BYTES
   val MESSAGE_TYPE_LENGTH = 1
   val ENTITY_TYPE_LENGTH = 1
-  def DOUBLE_BYTES: Int = java.lang.Double.BYTES
+  def FLOAT_BYTES: Int = java.lang.Float.BYTES
 
   // message types
   val NOTIFY: Byte = 0.toByte
   val UPDATE: Byte = 1.toByte
 
-
-  val ENTITY_SIZE: Int = ENTITY_TYPE_LENGTH + (3 * 3 + 4) * DOUBLE_BYTES // entity type + 3 vectors and 1 quaternion
+  val ENTITY_SIZE: Int = ENTITY_TYPE_LENGTH + (3 * 3 + 4) * FLOAT_BYTES // entity type + 3 vectors and 1 quaternion
 
   def readInput(bytes: ByteString): ClientInput = {
     val buf = bytes.asByteBuffer
     buf.order(ByteOrder.BIG_ENDIAN)
     ClientInput(
-      new DVector3(buf.getDouble, buf.getDouble, buf.getDouble),
-      new DVector3(buf.getDouble, buf.getDouble, buf.getDouble)
+      new DVector3(buf.getFloat, buf.getFloat, buf.getFloat),
+      new DVector3(buf.getFloat, buf.getFloat, buf.getFloat)
     )
   }
 
   private def putVector(buf: ByteBuffer, vec: DVector3C): Unit =
     for(i <- 0 to 2) {
-      buf.putDouble(vec.get(i))
+      buf.putFloat(vec.get(i).toFloat)
     }
 
   private def putQuaternion(buf: ByteBuffer, quat: DQuaternionC): Unit =
     for(i <- 0 to 3) {
-      buf.putDouble(quat.get(i))
+      buf.putFloat(quat.get(i).toFloat)
     }
 
   def clientUpdate(tickTime: Instant, entities: TraversableOnce[EntityData]): ByteString = {

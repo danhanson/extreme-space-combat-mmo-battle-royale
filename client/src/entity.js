@@ -7,9 +7,6 @@ export default class Entity {
   get geometry () {
     return this.constructor.geometry
   }
-  static get size () {
-    return 1 + (3 * 3 + 4) * 8
-  }
   constructor (position = new Three.Vector3(0, 0, 0), quaternion = new Three.Quaternion(0, 0, 0, 1), velocity = new Three.Vector3(0, 0, 0), rotation = new Three.Quaternion(0, 0, 0, 1)) {
     this.position = position
     this.quaternion = quaternion
