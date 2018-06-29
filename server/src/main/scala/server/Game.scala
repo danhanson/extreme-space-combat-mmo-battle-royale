@@ -50,12 +50,12 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     mass.setBoxTotal(150, 1, 1, 1)
     mass
   }
-  private val maxForce = 3
-  private val maxTorque = 1
-  private val plane = OdeHelper.createPlane(level, 0, 0, 1, 0) // place ground at z = 0
-  plane.setCategoryBits(GROUND)
+  private val maxForce = 100
+  private val maxTorque = 100
+  // private val plane = OdeHelper.createPlane(level, 0, 0, 1, 0) // place ground at z = 0
+  // plane.setCategoryBits(GROUND)
 
-  world.setGravity(0, 0, -9.8)
+  world.setGravity(0, 0, 0)
   logger.debug("World Constructed")
 
   private def removePlayer(player: Player, autoterminate: Boolean = true): Unit = {
@@ -99,7 +99,10 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     playerGeom.setData(player)
     players(playerId) = player
     logger.debug(s"player entity $playerId added to world")
-    val (done, sink) = Sink.foreach[ClientInput](player.input = _).preMaterialize()
+    val (done, sink) = Sink.foreach[ClientInput] { input =>
+      logger.debug(s"$name: $playerId: input: $input at: ${playerBody.getPosition()}")
+      player.input = input
+    }.preMaterialize()
     done.onComplete(_ => removePlayer(player))
     Flow.fromSinkAndSource(sink, playerSource.merge(globalSource))
   }
@@ -168,7 +171,7 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     level.collide(contactGroup, { (data, e1, e2) =>
       handleEncounter(data.asInstanceOf[DJointGroup], e1, e2)
     })
-    world.quickStep(stepSize)
+    world.step(stepSize)
     val instant = clock.instant()
     contactGroup.empty()
     logger.trace(s"$name: next tick computed")
@@ -198,6 +201,8 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
    */
   def terminate(): Unit = {
     stop()
+    pendingTasks.foreach(_.apply())
+    pendingTasks.clear()
     logger.debug(s"$name: terminating")
     logger.debug(s"$name: broadcasting termination notification")
     globalQueue.offer(MessageFormat.notification(clock.instant(), "Game Terminated"))

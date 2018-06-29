@@ -6,5 +6,5 @@
       }
     }]
   ],
-  "plugins": ["syntax-dynamic-import", "transform-object-rest-spread"]
+  "plugins": ["syntax-dynamic-import", "transform-object-rest-spread", "transform-strict-mode"]
 }
