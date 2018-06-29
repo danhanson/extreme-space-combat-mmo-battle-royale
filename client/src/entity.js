@@ -1,11 +1,11 @@
 import * as Three from 'three'
 
 export default class Entity {
-  static get geometry () {
-    return new Three.BoxBufferGeometry(1, 1, 1)
+  get material () {
+    return this.constructor.material
   }
-  static get material () {
-    return new Three.MeshBasicMaterial({ color: 0x538EED })
+  get geometry () {
+    return this.constructor.geometry
   }
   static get size () {
     return 1 + (3 * 3 + 4) * 8
@@ -18,13 +18,11 @@ export default class Entity {
   }
 
   extrapolate (delta) {
-    const position = this.position.clone().add(this.velocity.clone().multiplyScalar(delta))
-    const quaternion = this.quaternion.clone()
+    this.position.add(this.velocity.clone().multiplyScalar(delta))
     while (delta > 1) {
-      quaternion.multiply(this.rotation)
+      this.quaternion.multiply(this.rotation)
       delta -= 1
     }
-    quaternion.slerp(this.rotation.clone().multiply(quaternion), delta)
-    return new this.constructor(position, quaternion, this.velocity, this.rotation)
+    this.quaternion.slerp(this.rotation.clone().multiply(this.quaternion), delta)
   }
 }
