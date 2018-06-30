@@ -11,9 +11,9 @@ import org.ode4j.ode.OdeHelper
 
 object Main extends App with StrictLogging {
 
-  OdeHelper.initODE()
-
-  implicit val actorSystem: ActorSystem = ActorSystem("SPACE-GAME-2")
+  val defaultPort = 8080
+  val staticPath = Paths.get("../client/dist")
+  val intPattern = """(\d+)""".r
 
   def checkForNewline(): Boolean =
     Iterator.continually(Console.in.read())
@@ -25,29 +25,38 @@ object Main extends App with StrictLogging {
         case _ => false
       }
 
-  def pollConsole(binding: Http.ServerBinding, poll: Cancellable): Unit = {
-    logger.trace("Poll console")
-    if(checkForNewline()) {
-      poll.cancel()
-      println("Shutting down server")
-      binding.terminate(5 seconds).onComplete { _ =>
-        logger.debug("Terminating ActorSystem")
-        actorSystem.terminate()
-      }
-    }
+  val portOption = args.headOption match {
+    case Some(intPattern(number)) =>
+      Some(number.toInt)
+    case Some(arg) =>
+      println(s"received '$arg' expected port number")
+      None
+    case None =>
+      Some(defaultPort)
   }
+  portOption.foreach { port =>
 
-  implicit val executionContext: ExecutionContext = ExecutionContext.global
-  implicit val materializer: Materializer = ActorMaterializer.create(actorSystem)
-  val staticPath = Paths.get("../client/dist")
-  val server = new WebSocketServer("localhost", 8080, staticPath)
+    implicit val actorSystem: ActorSystem = ActorSystem("SPACE-GAME-2")
+    implicit val executionContext: ExecutionContext = ExecutionContext.global
+    implicit val materializer: Materializer = ActorMaterializer.create(actorSystem)
 
-  server.run().foreach {
-    case binding@Http.ServerBinding(address) =>
-      println(s"Game server binded to $address")
-      println(s"Serving files from ${staticPath.normalize().toAbsolutePath()}")
-      println(s"Press Enter to shutdown server")
-      var poll = Cancellable.alreadyCancelled
-      poll = materializer.schedulePeriodically(0 seconds, 1 second, () => pollConsole(binding, poll))
+    OdeHelper.initODE()
+
+    val server = new WebSocketServer("localhost", port, staticPath)
+    server.run().foreach {
+      case binding@Http.ServerBinding(address) =>
+        println(s"Game server binded to $address")
+        println(s"Serving files from ${staticPath.normalize().toAbsolutePath()}")
+        println(s"Press Enter to shutdown server")
+        do {
+          Thread.sleep(5000)
+          logger.trace("Poll console")
+        } while (!checkForNewline())
+        println("Shutting down server")
+        binding.terminate(5 seconds).onComplete { _ =>
+          logger.debug("Terminating ActorSystem")
+          actorSystem.terminate()
+        }
+    }
   }
 }
