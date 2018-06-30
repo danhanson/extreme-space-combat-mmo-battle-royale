@@ -32,7 +32,7 @@ export default function animateOutput ({ entities, notifications, lastUpdated })
   }
 
   function extrapolate (frameTime) {
-    const delta = (frameTime - lastUpdated()) / 1000 / 1.890967 // a magic number with no known origin
+    const delta = (frameTime - lastUpdated()) / 1000
     for (let e of entities()) {
       e.extrapolate(delta)
     }

@@ -1,7 +1,5 @@
 import * as Three from 'three'
 
-const extrapolate = true
-
 export default class Entity {
   get material () {
     return this.constructor.material
@@ -17,13 +15,11 @@ export default class Entity {
   }
 
   extrapolate (delta) {
-    if (extrapolate) {
-      this.position.add(this.velocity.clone().multiplyScalar(delta))
-      while (delta > 1) {
-        this.quaternion.multiply(this.rotation)
-        delta -= 1
-      }
-      this.quaternion.slerp(this.rotation.clone().multiply(this.quaternion), delta)
-    }
+    // this.position.add(this.velocity.clone().multiplyScalar(delta))
+    // while (delta > 1) {
+    //  this.quaternion.multiply(this.rotation)
+    //  delta -= 1
+    // }
+    // this.quaternion.slerp(this.rotation.clone().multiply(this.quaternion), delta)
   }
 }
