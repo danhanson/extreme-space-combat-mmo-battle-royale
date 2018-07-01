@@ -8,3 +8,4 @@ client/node_modules
 server/project/target
 ode4j
 *.log
+*.blend
