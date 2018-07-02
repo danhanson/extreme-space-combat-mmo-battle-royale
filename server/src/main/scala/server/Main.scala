@@ -12,7 +12,6 @@ import org.ode4j.ode.OdeHelper
 object Main extends App with StrictLogging {
 
   val defaultPort = 8080
-  val staticPath = Paths.get("../client/dist")
   val intPattern = """(\d+)""".r
 
   def checkForNewline(): Boolean =
@@ -42,14 +41,13 @@ object Main extends App with StrictLogging {
 
     OdeHelper.initODE()
 
-    val server = new WebSocketServer("localhost", port, staticPath)
+    val server = new WebServer("localhost", port)
     server.run().foreach {
       case binding@Http.ServerBinding(address) =>
         println(s"Game server binded to $address")
-        println(s"Serving files from ${staticPath.normalize().toAbsolutePath()}")
         println(s"Press Enter to shutdown server")
         do {
-          Thread.sleep(5000)
+          Thread.sleep(500)
           logger.trace("Poll console")
         } while (!checkForNewline())
         println("Shutting down server")
