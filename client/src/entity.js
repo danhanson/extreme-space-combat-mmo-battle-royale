@@ -1,11 +1,11 @@
 import * as Three from 'three'
 
 export default class Entity {
-  get material () {
-    return this.constructor.material
+  get resource () {
+    return this.constructor.resource
   }
-  get geometry () {
-    return this.constructor.geometry
+  get id () {
+    return this.constructor.id
   }
   constructor (position = new Three.Vector3(0, 0, 0), quaternion = new Three.Quaternion(0, 0, 0, 1), velocity = new Three.Vector3(0, 0, 0), rotation = new Three.Quaternion(0, 0, 0, 1)) {
     this.position = position

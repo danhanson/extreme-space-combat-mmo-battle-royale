@@ -3,15 +3,19 @@
  * @param {Object} Object returned by output.js
  */
 import * as Three from 'three'
-import Player from './player'
+import PlayerPromise from './player'
 
-export default function animateOutput ({ entities, notifications, lastUpdated }) {
+export default async function animateOutput ({ entities, notifications, lastUpdated }) {
+  const Player = await PlayerPromise
+
   const camera = new Three.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 15000)
   camera.position.z = 3
   const renderer = new Three.WebGLRenderer({
     antialias: true
   })
   const scene = new Three.Scene()
+  scene.add(new Three.AmbientLight(0x303030))
+  scene.add(new Three.DirectionalLight(0xffffff, 0.25))
   let meshes = meshMap()
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setPixelRatio(window.devicePixelRatio)
@@ -26,9 +30,9 @@ export default function animateOutput ({ entities, notifications, lastUpdated })
   )
 
   function meshMap () {
-    const meshes = new Map()
-    meshes.set(Player, [])
-    return meshes
+    return {
+      [Player.id]: []
+    }
   }
 
   function extrapolate (frameTime) {
@@ -43,9 +47,9 @@ export default function animateOutput ({ entities, notifications, lastUpdated })
     return notifications().filter(n => (frameTime - n.time) < thirtySeconds)
   }
 
-  function addMesh (mesh) {
-    scene.add(mesh)
-    return mesh
+  function addCopy (obj) {
+    scene.add(obj.clone())
+    return obj
   }
 
   function updateScene (frameTime) {
@@ -54,20 +58,20 @@ export default function animateOutput ({ entities, notifications, lastUpdated })
     filterNotifications(frameTime)
 
     // reverse the mesh arrays so meshes stay in order when popped and pushed
-    for (let array of meshes.values()) {
+    for (let array of Object.values(meshes)) {
       array.reverse()
     }
 
     // adjust meshes based on entities, it doesn't matter if a mesh changes entities as long as
     // the entity type doesn't change
-    for (let { position, quaternion, constructor, geometry, material } of entities()) {
-      let mesh = meshes.get(constructor).pop() || addMesh(new Three.Mesh(geometry, material))
+    for (let { position, quaternion, id, resource } of entities()) {
+      let mesh = meshes[id].pop() || addCopy(resource)
       mesh.position.copy(position)
       mesh.quaternion.copy(quaternion)
-      newMeshes.get(constructor).push(mesh)
+      newMeshes[id].push(mesh)
     }
     // remove remaining garbage meshes
-    for (let meshList of meshes.values()) {
+    for (let meshList of Object.values(meshes)) {
       for (let mesh of meshList) {
         scene.remove(mesh)
       }

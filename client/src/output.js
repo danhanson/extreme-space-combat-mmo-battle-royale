@@ -6,15 +6,21 @@
  * @param {WebSocket} the websocket events are listened from
  */
 import * as Three from 'three'
-import Player from './player'
+import PlayerPromise from './player'
 
 const entitySize = 1 + (3 * 3 + 4) * 4 // type tag, 3 vectors and a quaternion
 const decoder = new TextDecoder('utf-8')
-const entityConstructors = {
-  0: (...args) => new Player(...args)
+
+async function loadResources () {
+  const Player = await PlayerPromise
+  return {
+    [Player.id]: (...args) => new Player(...args)
+  }
 }
 
-export default function bindOutput (ws) {
+export default async function bindOutput (ws) {
+  const entityConstructors = await loadResources()
+
   let entities = []
   let notifications = []
   let lastUpdated = performance.timeOrigin + performance.now()
@@ -63,7 +69,6 @@ export default function bindOutput (ws) {
         return
       case 1: // world update
         entities = []
-        const oldTime = lastUpdated
         lastUpdated = time
         for (let i = 9; i < messageView.byteLength; i += entitySize) {
           let entityConstructor = entityConstructors[messageView.getUint8(i)]
@@ -77,8 +82,6 @@ export default function bindOutput (ws) {
             )
           )
         }
-        console.log(oldTime)
-        console.log(entities[0])
         return
       default: // unrecognized message
         console.warn('Unrecognized message')

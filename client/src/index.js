@@ -13,5 +13,8 @@ const ws = (() => {
   return ws
 })()
 
-animateOutput(bindOutput(ws))
 bindInput(ws)
+
+bindOutput(ws).then(output => {
+  animateOutput(output)
+})
