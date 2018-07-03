@@ -26,6 +26,8 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
   // clock used for getting message times
   private val clock = Clock.systemUTC()
 
+  private val playerModel = Model.load("player")
+
   // queue and source for global notifications
   private val (globalQueue, globalSource) = Source.queue[ByteString](5, OverflowStrategy.fail).preMaterialize()
 
@@ -79,7 +81,7 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     }
     logger.info(s"$playerId joining game $name")
     logger.debug(s"adding player entity $playerId to world")
-    val playerGeom = OdeHelper.createBox(1, 1, 1)
+    val playerGeom = playerModel.geom()
     val playerBody = OdeHelper.createBody(world)
     val spaceSphere = OdeHelper.createSphere(150)
     val playerSpaceData = PlayerSpace(mutable.Buffer.empty)

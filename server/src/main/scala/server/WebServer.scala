@@ -53,7 +53,7 @@ class WebServer(interface: String, port: Int)(implicit actorSystem: ActorSystem,
       pathSingleSlash {
         getFromResource("dist/index.html") ~
         getFromFile("../client/dist/index.html")
-      }
+      } ~
       getFromResourceDirectory("dist") ~
       getFromDirectory("../client/dist")
     }
