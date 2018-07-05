@@ -7,8 +7,8 @@
  */
 import * as Three from 'three'
 import PlayerPromise from './player'
+import ByteReader from './byte-reader'
 
-const entitySize = 1 + (3 * 3 + 4) * 4 // type tag, 3 vectors and a quaternion
 const decoder = new TextDecoder('utf-8')
 
 async function loadResources () {
@@ -22,64 +22,39 @@ export default async function bindOutput (ws) {
   const entityConstructors = await loadResources()
 
   let entities = []
+  let player = {
+    position: new Three.Vector3(0, 0, 0),
+    quaternion: new Three.Quaternion(0, 0, 0, 1),
+    velocity: new Three.Vector3(0, 0, 0),
+    rotation: new Three.Vector3(0, 0, 0)
+  }
   let notifications = []
   let lastUpdated = performance.timeOrigin + performance.now()
 
-  function * getFloats (dataView, i) {
-    while (i < dataView.byteLength) {
-      yield dataView.getFloat32(i)
-      i += 4
-    }
-  }
-
-  function getVector (numbers) {
-    return new Three.Vector3(
-      numbers.next().value,
-      numbers.next().value,
-      numbers.next().value
-    )
-  }
-
-  function getQuaternion (numbers) {
-    const w = numbers.next().value
-    return new Three.Quaternion(
-      numbers.next().value,
-      numbers.next().value,
-      numbers.next().value,
-      w
-    )
-  }
-
-  function getQuatFromEuler (numbers) {
-    const quat = new Three.Quaternion()
-    quat.setFromEuler(new Three.Euler(
-      numbers.next().value,
-      numbers.next().value,
-      numbers.next().value
-    ))
-    return quat
-  }
-
   function applyUpdate (message) {
-    const messageView = new DataView(message)
-    const time = Number(messageView.getBigUint64(0))
-    switch (messageView.getUint8(8)) {
+    const reader = ByteReader(message)
+    const time = Number(reader.getBigUint64())
+    switch (reader.getUint8()) {
       case 0: // text notification
-        const text = decoder.decode(new Uint8Array(message.data, 9))
-        notifications.push({ text, time })
+        const text = decoder.decode(new Uint8Array(message.data, reader.getIndex()))
+        notifications = [...notifications, { text, time }]
         return
       case 1: // world update
         entities = []
         lastUpdated = time
-        for (let i = 9; i < messageView.byteLength; i += entitySize) {
-          let entityConstructor = entityConstructors[messageView.getUint8(i)]
-          let numbers = getFloats(messageView, i + 1)
+        reader.getUint8() // discard tag
+        player.position = reader.getVector()
+        player.quaternion = reader.getQuaternion()
+        player.velocity = reader.getVector()
+        player.rotation = reader.getQuatFromEuler()
+        while (reader.bytesLeft() > 0) {
+          let entityConstructor = entityConstructors[reader.getUint8()]
           entities.push(
             entityConstructor(
-              getVector(numbers),
-              getQuaternion(numbers),
-              getVector(numbers),
-              getQuatFromEuler(numbers)
+              reader.getVector(),
+              reader.getQuaternion(),
+              reader.getVector(),
+              reader.getQuatFromEuler()
             )
           )
         }
@@ -105,6 +80,9 @@ export default async function bindOutput (ws) {
     },
     lastUpdated () {
       return lastUpdated
+    },
+    player () {
+      return player
     }
   }
 }

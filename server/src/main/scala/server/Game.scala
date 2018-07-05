@@ -60,16 +60,20 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
   world.setGravity(0, 0, 0)
   logger.debug("World Constructed")
 
-  private def removePlayer(player: Player, autoterminate: Boolean = true): Unit = {
+  private def removePlayer(player: Player, termination: Boolean = false): Unit = {
     if(!players.contains(player.name)) {
       logger.debug(s"$name: ${player.name} already removed")
       return
     }
-    pendingTasks += { () => player.destroy() }
+    if(termination) {
+      player.destroy()
+    } else {
+      pendingTasks += { () => player.destroy() }
+    }
     logger.info(s"$name: ${player.name} removed from game")
     globalQueue.offer(MessageFormat.notification(clock.instant(), s"${player.name} left the game"))
     players.remove(player.name)
-    if(autoterminate && players.size == 0) {
+    if(!termination && players.size == 0) {
       logger.info(s"$name: all players left game, terminating")
       terminate()
     }
@@ -113,7 +117,7 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
       (o1.getData, o2.getData) match {
         case (p1: PlayerSpace, p2: Entity) => // entity exists within player space
           p1.entities += EntityData(p2, o2.getBody)
-        case (e1: Entity, e2: Entity) => // 2 entities collide
+        case (e1: Entity, e2: Entity) => // 2 entities collide, TODO: send player collisions as updates to server
           val contacts = new DContactBuffer(4)
           val contactCount = OdeHelper.collide(o1, o2, 4, contacts.getGeomBuffer)
           for(i <- 0 until contactCount) {
@@ -206,15 +210,18 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     stop()
     pendingTasks.foreach(_.apply())
     pendingTasks.clear()
-    logger.debug(s"$name: terminating")
-    logger.debug(s"$name: broadcasting termination notification")
-    globalQueue.offer(MessageFormat.notification(clock.instant(), "Game Terminated"))
-    logger.debug(s"$name: removing all players")
-    players.values.foreach(removePlayer(_, false))
-    globalQueue.complete()
-    logger.debug(s"$name: destroying world")
-    world.destroy()
-    logger.info(s"$name: terminated")
-    terminationPromise.success(Done)
+    // wait for possible last tick to finish
+    materializer.scheduleOnce(stepSize.seconds, () => {
+      logger.debug(s"$name: terminating")
+      logger.debug(s"$name: broadcasting termination notification")
+      globalQueue.offer(MessageFormat.notification(clock.instant(), "Game Terminated"))
+      logger.debug(s"$name: removing all players")
+      players.values.foreach(removePlayer(_, true))
+      globalQueue.complete()
+      logger.debug(s"$name: destroying world")
+      world.destroy()
+      logger.info(s"$name: terminated")
+      terminationPromise.success(Done)
+    })
   }
 }

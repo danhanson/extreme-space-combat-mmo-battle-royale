@@ -5,7 +5,7 @@
 import * as Three from 'three'
 import PlayerPromise from './player'
 
-export default async function animateOutput ({ entities, notifications, lastUpdated }) {
+export default async function animateOutput ({ entities, notifications, lastUpdated, player }) {
   const Player = await PlayerPromise
 
   const camera = new Three.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 15000)
@@ -58,7 +58,10 @@ export default async function animateOutput ({ entities, notifications, lastUpda
     const newMeshes = meshMap()
     extrapolate(frameTime)
     filterNotifications(frameTime)
-
+    const {
+      position: playerPosition,
+      quaternion: playerQuaternion
+    } = player()
     // reverse the mesh arrays so meshes stay in order when popped and pushed
     for (let array of Object.values(meshes)) {
       array.reverse()
@@ -66,15 +69,12 @@ export default async function animateOutput ({ entities, notifications, lastUpda
 
     // adjust meshes based on entities, it doesn't matter if a mesh changes entities as long as
     // the entity type doesn't change
-    for (let { position, quaternion, id, resource, velocity } of entities()) {
+    for (let { position, quaternion, id, resource } of entities()) {
       let object = meshes[id].pop() || addCopy(resource)
       // console.log(position)
       // console.log(quaternion)
-      object.position.copy(position)
-      object.quaternion.copy(quaternion)
-      object.data = {
-        velocity
-      }
+      object.position.copy(position).sub(playerPosition)
+      object.quaternion.copy(quaternion).multiply(playerQuaternion)
       newMeshes[id].push(object)
     }
     // remove remaining garbage meshes
@@ -92,10 +92,11 @@ export default async function animateOutput ({ entities, notifications, lastUpda
     const player = meshes[0][0]
     if (player) {
       window.player = player
-      camera.position.copy(player.position)
       camera.up.copy(player.up)
-      camera.position.y -= 3
-      camera.lookAt(player.position)
+      const position = new Three.Vector3(0, -3, 2) // 3 behind
+      position.applyMatrix4(player.matrix)
+      camera.position.copy(position)
+      camera.lookAt(player.position.clone().add(player.up.clone().multiplyScalar(2)))
     }
     renderer.render(scene, camera)
     requestAnimationFrame(doFrame)
