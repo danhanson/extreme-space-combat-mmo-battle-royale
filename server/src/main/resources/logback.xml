@@ -13,6 +13,7 @@
         </encoder>
     </appender>
 
+    <logger name="server.Game$" level="trace"/>
     <root level="debug">
         <appender-ref ref="STDOUT" />
     </root>

@@ -13,12 +13,12 @@ export default function bindInput (ws) {
     down: 0,
     forward: 0,
     backward: 0,
-    rotateLeft: 0,
-    rotateRight: 0,
-    rotateDown: 0,
     rotateUp: 0,
-    spinLeft: 0,
-    spinRight: 0
+    rotateDown: 0,
+    rollRight: 0,
+    rollLeft: 0,
+    turnRight: 0,
+    turnLeft: 0
   }
 
   let pressedKeys = new Set()
@@ -26,12 +26,12 @@ export default function bindInput (ws) {
   function sendUpdate () {
     const buffer = new ArrayBuffer(6 * 4) // 2 3d vectors
     const view = new DataView(buffer)
-    view.setFloat32(0, input.left - input.right)
-    view.setFloat32(4, input.up - input.down)
-    view.setFloat32(8, input.forward - input.backward)
-    view.setFloat32(12, input.rotateLeft - input.rotateRight)
-    view.setFloat32(16, input.rotateUp - input.rotateDown)
-    view.setFloat32(20, input.spinLeft - input.spinRight)
+    view.setFloat32(0, input.right - input.left)
+    view.setFloat32(4, input.forward - input.backward)
+    view.setFloat32(8, input.up - input.down)
+    view.setFloat32(12, input.rotateUp - input.rotateDown)
+    view.setFloat32(16, input.rollRight - input.rollLeft)
+    view.setFloat32(20, input.turnLeft - input.turnRight)
     ws.send(buffer)
   }
 
@@ -39,7 +39,7 @@ export default function bindInput (ws) {
     switch (code) {
       case 'ArrowRight':
       case 'KeyD':
-        input.rotateRight = val
+        input.turnRight = val
         break
       case 'ArrowUp':
       case 'KeyW':
@@ -47,7 +47,7 @@ export default function bindInput (ws) {
         break
       case 'ArrowLeft':
       case 'KeyA':
-        input.rotateLeft = val
+        input.turnLeft = val
         break
       case 'ArrowDown':
       case 'KeyS':

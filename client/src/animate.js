@@ -9,13 +9,15 @@ export default async function animateOutput ({ entities, notifications, lastUpda
   const Player = await PlayerPromise
 
   const camera = new Three.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 15000)
-  camera.position.z = 3
+  window.camera = camera
+  camera.position.copy(new Three.Vector3(0, 0, -3))
   const renderer = new Three.WebGLRenderer({
     antialias: true
   })
   const scene = new Three.Scene()
-  scene.add(new Three.AmbientLight(0x303030))
-  scene.add(new Three.DirectionalLight(0xffffff, 0.25))
+  scene.add(new Three.AxesHelper(5))
+  scene.add(new Three.AmbientLight(0x505050))
+  scene.add(new Three.DirectionalLight(0xffffff, 0.5))
   let meshes = meshMap()
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setPixelRatio(window.devicePixelRatio)
@@ -48,7 +50,7 @@ export default async function animateOutput ({ entities, notifications, lastUpda
   }
 
   function addCopy (obj) {
-    scene.add(obj.clone())
+    scene.add(obj)
     return obj
   }
 
@@ -64,11 +66,16 @@ export default async function animateOutput ({ entities, notifications, lastUpda
 
     // adjust meshes based on entities, it doesn't matter if a mesh changes entities as long as
     // the entity type doesn't change
-    for (let { position, quaternion, id, resource } of entities()) {
-      let mesh = meshes[id].pop() || addCopy(resource)
-      mesh.position.copy(position)
-      mesh.quaternion.copy(quaternion)
-      newMeshes[id].push(mesh)
+    for (let { position, quaternion, id, resource, velocity } of entities()) {
+      let object = meshes[id].pop() || addCopy(resource)
+      // console.log(position)
+      // console.log(quaternion)
+      object.position.copy(position)
+      object.quaternion.copy(quaternion)
+      object.data = {
+        velocity
+      }
+      newMeshes[id].push(object)
     }
     // remove remaining garbage meshes
     for (let meshList of Object.values(meshes)) {
@@ -82,9 +89,19 @@ export default async function animateOutput ({ entities, notifications, lastUpda
   function doFrame () {
     const frameTime = performance.timeOrigin + performance.now()
     updateScene(frameTime)
+    const player = meshes[0][0]
+    if (player) {
+      window.player = player
+      camera.position.copy(player.position)
+      camera.up.copy(player.up)
+      camera.position.y -= 3
+      camera.lookAt(player.position)
+    }
     renderer.render(scene, camera)
     requestAnimationFrame(doFrame)
   }
+  const vec = new Three.Vector3()
+  camera.getWorldDirection(vec)
   requestAnimationFrame(doFrame)
 }
 

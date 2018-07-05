@@ -1,7 +1,10 @@
 import bindInput from './input'
 import bindOutput from './output'
 import animateOutput from './animate'
+import * as Three from 'three'
 import './main.styl'
+
+Three.Object3D.DefaultUp = new Three.Vector3(0, 0, 1)
 
 let game = prompt('Enter the game you want to join: ')
 let name = prompt('Enter You Name: ')

@@ -41,11 +41,12 @@ export default async function bindOutput (ws) {
   }
 
   function getQuaternion (numbers) {
+    const w = numbers.next().value
     return new Three.Quaternion(
       numbers.next().value,
       numbers.next().value,
       numbers.next().value,
-      numbers.next().value
+      w
     )
   }
 

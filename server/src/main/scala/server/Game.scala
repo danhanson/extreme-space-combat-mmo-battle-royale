@@ -138,8 +138,9 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     for(player <- players.values) {
       player.input match {
         case ClientInput(force, torque) =>
+          logger.trace(s"input: $force, $torque")
           player.playerShape.getBody.addRelForce(clamp(maxForce)(force))
-          player.playerShape.getBody.addRelTorque(clamp(maxTorque)(torque))
+          player.playerShape.getBody.addTorque(clamp(maxTorque)(torque))
       }
     }
   }
