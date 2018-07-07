@@ -7,7 +7,6 @@ import akka.http.scaladsl.Http
 import java.nio.file.Paths
 import scala.concurrent.duration._
 import com.typesafe.scalalogging.StrictLogging
-import breeze.linalg._
 import org.ode4j.ode.OdeHelper
 
 object Main extends App with StrictLogging {
