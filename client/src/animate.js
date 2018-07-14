@@ -5,27 +5,39 @@
 import * as Three from 'three'
 import PlayerPromise from './player'
 
+const one = new Three.Vector3(1, 1, 1)
+const zero = new Three.Vector3(0, 0, 0)
+
 export default async function animateOutput ({ entities, notifications, lastUpdated, player }) {
   const Player = await PlayerPromise
 
-  const camera = new Three.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 15000)
+  const camera = new Three.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.01, 150)
   window.camera = camera
-  camera.position.copy(new Three.Vector3(0, 0, -3))
+  camera.position.copy(new Three.Vector3(0, -3, 2))
+  camera.lookAt(new Three.Vector3(0, 0, 1))
   const renderer = new Three.WebGLRenderer({
     antialias: true
   })
+  renderer.setClearColor(0x222222)
   const scene = new Three.Scene()
   scene.add(new Three.AxesHelper(5))
-  scene.add(new Three.AmbientLight(0x505050))
-  scene.add(new Three.DirectionalLight(0xffffff, 0.5))
+  scene.add(new Three.AmbientLight(0x333333))
+  scene.add(new Three.DirectionalLight(0xFFFFFF, 0.5))
   let meshes = meshMap()
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setPixelRatio(window.devicePixelRatio)
+  const playerObject = Player.resource
+  playerObject.position.copy(zero)
+  window.player = playerObject
+  window.camera = camera
+  scene.add(playerObject)
+
   document.body.appendChild(renderer.domElement)
 
   window.addEventListener('resize',
     ({ target: { innerWidth, innerHeight } }) => {
-      renderer.resize(innerWidth, innerHeight)
+      renderer.setSize(innerWidth, innerHeight)
+      renderer.setPixelRatio(window.devicePixelRatio)
       camera.aspect = innerWidth / innerHeight
       camera.updateProjectionMatrix()
     }
@@ -49,32 +61,41 @@ export default async function animateOutput ({ entities, notifications, lastUpda
     return notifications().filter(n => (frameTime - n.time) < thirtySeconds)
   }
 
-  function addCopy (obj) {
+  function add (obj) {
+    obj.matrixAutoUpdate = false
     scene.add(obj)
     return obj
+  }
+
+  function getPlayerViewMatrix () {
+    const {
+      position,
+      quaternion
+    } = player()
+    const transform = new Three.Matrix4()
+    transform.compose(position, quaternion, one)
+    const view = new Three.Matrix4()
+    view.getInverse(transform, true)
+    return view
   }
 
   function updateScene (frameTime) {
     const newMeshes = meshMap()
     extrapolate(frameTime)
     filterNotifications(frameTime)
-    const {
-      position: playerPosition,
-      quaternion: playerQuaternion
-    } = player()
     // reverse the mesh arrays so meshes stay in order when popped and pushed
     for (let array of Object.values(meshes)) {
       array.reverse()
     }
-
+    const playerInfo = player()
+    console.log(playerInfo)
+    const playerView = getPlayerViewMatrix()
     // adjust meshes based on entities, it doesn't matter if a mesh changes entities as long as
     // the entity type doesn't change
     for (let { position, quaternion, id, resource } of entities()) {
-      let object = meshes[id].pop() || addCopy(resource)
-      // console.log(position)
-      // console.log(quaternion)
-      object.position.copy(position).sub(playerPosition)
-      object.quaternion.copy(quaternion).multiply(playerQuaternion)
+      let object = meshes[id].pop() || add(resource)
+      object.matrix.compose(position, quaternion, one)
+      object.matrix.premultiply(playerView)
       newMeshes[id].push(object)
     }
     // remove remaining garbage meshes
@@ -89,21 +110,8 @@ export default async function animateOutput ({ entities, notifications, lastUpda
   function doFrame () {
     const frameTime = performance.timeOrigin + performance.now()
     updateScene(frameTime)
-    const player = meshes[0][0]
-    if (player) {
-      window.player = player
-      camera.up.copy(player.up)
-      const position = new Three.Vector3(0, -3, 2) // 3 behind
-      position.applyMatrix4(player.matrix)
-      camera.position.copy(position)
-      camera.lookAt(player.position.clone().add(player.up.clone().multiplyScalar(2)))
-    }
     renderer.render(scene, camera)
     requestAnimationFrame(doFrame)
   }
-  const vec = new Three.Vector3()
-  camera.getWorldDirection(vec)
   requestAnimationFrame(doFrame)
 }
-
-window.fraction = 1

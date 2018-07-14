@@ -115,8 +115,8 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
 
   private def handleEncounter(contactGroup: DJointGroup, o1: DGeom, o2: DGeom): Unit = {
       (o1.getData, o2.getData) match {
-        case (p1: PlayerSpace, p2: Entity) => // entity exists within player space
-          p1.entities += EntityData(p2, o2.getBody)
+        case (e: Entity, space: PlayerSpace) => // entity exists within player space
+          space.entities += EntityData(e, o1.getBody)
         case (e1: Entity, e2: Entity) => // 2 entities collide, TODO: send player collisions as updates to server
           val contacts = new DContactBuffer(4)
           val contactCount = OdeHelper.collide(o1, o2, 4, contacts.getGeomBuffer)
