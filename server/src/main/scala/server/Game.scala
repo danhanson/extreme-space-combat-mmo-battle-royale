@@ -97,10 +97,13 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     playerGeom.setCollideBits(PLAYER | GROUND)
     playerGeom.setBody(playerBody)
     playerBody.setMass(playerMass)
+    playerBody.setAngularDampingThreshold(0)
+    playerBody.setAngularDamping(0.25)
+    playerBody.setLinearDampingThreshold(500)
+    playerBody.setLinearDamping(1)
     pendingTasks += { () => level.add(playerGeom) } += { () => level.add(spaceSphere) }
     val (playerQueue, playerSource) = Source.queue[ByteString](1, OverflowStrategy.dropHead).preMaterialize()
     val player = Player(playerId, ClientInput(DVector3.ZERO, DVector3.ZERO), playerGeom, playerSpaceData, playerQueue)
-    playerSpaceData.entities += player.toEntityData
     globalQueue.offer(MessageFormat.notification(clock.instant(), s"$playerId joined the game"))
     playerGeom.setData(player)
     players(playerId) = player
@@ -152,7 +155,7 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
   // player spaces are cleared before the next collision check
   // the only thing in each player space is the player itself,
   // which is the first entity of each space
-  def clearSpaces(): Unit = {
+  def resetSpaces(): Unit = {
     for(player <- players.values) {
       player.playerSpace.entities.clear()
       player.playerSpace.entities += EntityData(player, player.playerShape.getBody)
@@ -172,9 +175,9 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     logger.trace(s"$name: computing next tick")
     applyInputs()
     logger.trace(s"$name: applying player inputs")
-    clearSpaces()
     val contactGroup = OdeHelper.createJointGroup()
     logger.trace(s"$name: applying step")
+    resetSpaces()
     level.collide(contactGroup, { (data, e1, e2) =>
       handleEncounter(data.asInstanceOf[DJointGroup], e1, e2)
     })
