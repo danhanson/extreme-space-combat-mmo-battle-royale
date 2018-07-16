@@ -52,7 +52,7 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     mass.setBoxTotal(150, 1, 1, 1)
     mass
   }
-  private val maxForce = 100
+  private val maxForce = 400
   private val maxTorque = 100
   // private val plane = OdeHelper.createPlane(level, 0, 0, 1, 0) // place ground at z = 0
   // plane.setCategoryBits(GROUND)
@@ -98,8 +98,8 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     playerGeom.setBody(playerBody)
     playerBody.setMass(playerMass)
     playerBody.setAngularDampingThreshold(0)
-    playerBody.setAngularDamping(0.25)
-    playerBody.setLinearDampingThreshold(500)
+    playerBody.setAngularDamping(0.15)
+    playerBody.setLinearDampingThreshold(2000)
     playerBody.setLinearDamping(1)
     pendingTasks += { () => level.add(playerGeom) } += { () => level.add(spaceSphere) }
     val (playerQueue, playerSource) = Source.queue[ByteString](1, OverflowStrategy.dropHead).preMaterialize()
@@ -146,8 +146,8 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
       player.input match {
         case ClientInput(force, torque) =>
           logger.trace(s"input: $force, $torque")
-          player.playerShape.getBody.addRelForce(clamp(maxForce)(force))
-          player.playerShape.getBody.addTorque(clamp(maxTorque)(torque))
+          player.playerShape.getBody.addRelForce(clamp(maxForce)(force.reScale(4)))
+          player.playerShape.getBody.addRelTorque(clamp(maxTorque)(torque))
       }
     }
   }

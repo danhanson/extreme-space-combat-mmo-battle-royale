@@ -8,21 +8,27 @@ const objLoader = new Three.OBJLoader()
 const mtlLoader = new MTLLoader()
 const noop = () => {}
 
-function loadObj (resource) {
+export function loadObj (resource) {
   return new Promise((resolve, reject) => {
     objLoader.load(resource, resolve, noop, reject)
   })
 }
 
-function loadMTL (resource) {
+export function loadMTL (resource) {
   return new Promise((resolve, reject) => {
     mtlLoader.load(resource, resolve, noop, reject)
   })
 }
 
-export default async (resource) => {
-  const mtl = await loadMTL(`models/${resource}.mtl`)
+export async function load (resource) {
+  const mtl = await loadMTL(`${resource}.mtl`)
   objLoader.setMaterials(mtl)
-  const obj = await loadObj(`models/${resource}.obj`)
+  const obj = await loadObj(`${resource}.obj`)
   return obj
+}
+
+export default {
+  load,
+  loadObj,
+  loadMTL
 }

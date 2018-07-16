@@ -61,6 +61,12 @@ export default function bindInput (ws) {
       case 'ControlRight':
         input.backward = val
         break
+      case 'KeyQ':
+        input.rollLeft = val
+        break
+      case 'KeyE':
+        input.rollRight = val
+        break
       default:
         return // don't send update for garbage keys
     }

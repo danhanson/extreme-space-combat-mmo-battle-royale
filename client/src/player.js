@@ -1,8 +1,8 @@
 import Entity from './entity'
-import load from './obj-loader.js'
+import { load } from './obj-loader.js'
 
 export default (async () => {
-  const obj = await load('player')
+  const obj = await load('/models/player')
   return class Player extends Entity {
     static get resource () {
       return obj.clone()

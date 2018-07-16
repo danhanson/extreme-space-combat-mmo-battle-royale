@@ -4,24 +4,24 @@
  */
 import * as Three from 'three'
 import PlayerPromise from './player'
+import SpacePromise from './space'
 
 const one = new Three.Vector3(1, 1, 1)
 const zero = new Three.Vector3(0, 0, 0)
 
 export default async function animateOutput ({ entities, notifications, lastUpdated, player }) {
   const Player = await PlayerPromise
+  const space = await SpacePromise
 
-  const camera = new Three.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.01, 150)
-  window.camera = camera
+  const camera = new Three.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.01, 100000)
   camera.position.copy(new Three.Vector3(0, -3, 2))
   camera.lookAt(new Three.Vector3(0, 0, 1))
   const renderer = new Three.WebGLRenderer({
     antialias: true
   })
-  renderer.setClearColor(0x222222)
   const scene = new Three.Scene()
-  scene.add(new Three.AxesHelper(5))
-  scene.add(new Three.AmbientLight(0x333333))
+  scene.add(space)
+  scene.add(new Three.AmbientLight(0x666666))
   scene.add(new Three.DirectionalLight(0xFFFFFF, 0.5))
   let meshes = meshMap()
   renderer.setSize(window.innerWidth, window.innerHeight)
@@ -87,9 +87,8 @@ export default async function animateOutput ({ entities, notifications, lastUpda
     for (let array of Object.values(meshes)) {
       array.reverse()
     }
-    const playerInfo = player()
-    console.log(playerInfo)
     const playerView = getPlayerViewMatrix()
+    space.setRotationFromMatrix(playerView)
     // adjust meshes based on entities, it doesn't matter if a mesh changes entities as long as
     // the entity type doesn't change
     for (let { position, quaternion, id, resource } of entities()) {
