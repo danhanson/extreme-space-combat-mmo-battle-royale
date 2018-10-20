@@ -3,22 +3,19 @@ package server
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.directives.ContentTypeResolver
-import akka.Done
 import akka.stream.Materializer
 import akka.stream.scaladsl._
 import akka.util.ByteString
 import scala.collection.mutable
 import scala.concurrent._
-import java.nio.file._
 import com.typesafe.scalalogging.StrictLogging
 
-class WebServer(interface: String, port: Int)(implicit actorSystem: ActorSystem, materializer: Materializer, executionContext: ExecutionContext) extends StrictLogging {
+final class WebServer(interface: String, port: Int)(implicit actorSystem: ActorSystem, materializer: Materializer, executionContext: ExecutionContext) extends StrictLogging {
 
-  implicit protected def contentTypeResolver = ContentTypeResolver.Default
+  implicit private def contentTypeResolver: ContentTypeResolver = ContentTypeResolver.Default
 
   private val games = mutable.Map.empty[String, Game]
 
@@ -37,7 +34,7 @@ class WebServer(interface: String, port: Int)(implicit actorSystem: ActorSystem,
     })
   }
 
-  val httpFlow = Route.handlerFlow {
+  private val httpFlow = Route.handlerFlow {
     get {
       path("socket" / Segment / Segment) { case (room, player) =>
         headerValueByType[UpgradeToWebSocket](()) { upgrade =>

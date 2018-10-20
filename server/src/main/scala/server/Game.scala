@@ -54,8 +54,6 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
   }
   private val maxForce = 400
   private val maxTorque = 100
-  // private val plane = OdeHelper.createPlane(level, 0, 0, 1, 0) // place ground at z = 0
-  // plane.setCategoryBits(GROUND)
 
   world.setGravity(0, 0, 0)
   logger.debug("World Constructed")
@@ -73,7 +71,7 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     logger.info(s"$name: ${player.name} removed from game")
     globalQueue.offer(MessageFormat.notification(clock.instant(), s"${player.name} left the game"))
     players.remove(player.name)
-    if(!termination && players.size == 0) {
+    if(!termination && players.isEmpty) {
       logger.info(s"$name: all players left game, terminating")
       terminate()
     }
@@ -109,7 +107,7 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     players(playerId) = player
     logger.debug(s"player entity $playerId added to world")
     val (done, sink) = Sink.foreach[ClientInput] { input =>
-      logger.debug(s"$name: $playerId: input: $input at: ${playerBody.getPosition()}")
+      logger.debug(s"$name: $playerId: input: $input at: ${playerBody.getPosition}")
       player.input = input
     }.preMaterialize()
     done.onComplete(_ => removePlayer(player))
@@ -120,7 +118,7 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
       (o1.getData, o2.getData) match {
         case (e: Entity, space: PlayerSpace) => // entity exists within player space
           space.entities += EntityData(e, o1.getBody)
-        case (e1: Entity, e2: Entity) => // 2 entities collide, TODO: send player collisions as updates to server
+        case (e1: Entity, e2: Entity) => // 2 entities collide
           val contacts = new DContactBuffer(4)
           val contactCount = OdeHelper.collide(o1, o2, 4, contacts.getGeomBuffer)
           for(i <- 0 until contactCount) {
@@ -152,9 +150,8 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     }
   }
 
-  // player spaces are cleared before the next collision check
-  // the only thing in each player space is the player itself,
-  // which is the first entity of each space
+  // player spaces are cleared before the next collision check,
+  // the only thing in each player space is the player itself
   def resetSpaces(): Unit = {
     for(player <- players.values) {
       player.playerSpace.entities.clear()
@@ -169,6 +166,9 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
     }
   }
 
+  /**
+    * Run synchronous tasks, read player input, compute one tick, send updates
+    */
   def step(): Unit = {
     pendingTasks.foreach(_.apply())
     pendingTasks.clear()
@@ -219,7 +219,7 @@ class Game(name: String)(implicit executionContext: ExecutionContext, materializ
       logger.debug(s"$name: broadcasting termination notification")
       globalQueue.offer(MessageFormat.notification(clock.instant(), "Game Terminated"))
       logger.debug(s"$name: removing all players")
-      players.values.foreach(removePlayer(_, true))
+      players.values.foreach(removePlayer(_, termination = true))
       globalQueue.complete()
       logger.debug(s"$name: destroying world")
       world.destroy()

@@ -2,9 +2,8 @@ package server
 
 import scala.concurrent.ExecutionContext
 import akka.stream.{ActorMaterializer, Materializer}
-import akka.actor.{ActorSystem, Cancellable}
+import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import java.nio.file.Paths
 import scala.concurrent.duration._
 import com.typesafe.scalalogging.StrictLogging
 import org.ode4j.ode.OdeHelper
@@ -13,10 +12,6 @@ object Main extends App with StrictLogging {
 
   val defaultPort = 8080
   val intPattern = """(\d+)""".r
-  /*Model.solveIntersection(
-    Seq(DenseVector(0f, 0f, 0f), DenseVector(2f, 2f, 2f)),
-    Seq(DenseVector(1f, 1f, 1f), DenseVector(3f, 3f, 3f))
-  )*/
 
   def checkForNewline(): Boolean =
     Iterator.continually(Console.in.read())

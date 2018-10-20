@@ -4,6 +4,8 @@ import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.util.ByteString
 import org.ode4j.ode.DGeom
 
+import scala.collection.mutable
+
 case class Player(
     name: String, // unique id for each player
     var input: ClientInput, // commands provided by client
@@ -15,14 +17,14 @@ case class Player(
   override val id: Byte = 0.toByte
 
   /**
-    * Removes player from game and disconnects websocket, providing an optional throwable if caused by exception.
-    * Player should not be used after destroy is called
+    * Removes player from game and closes websocket, providing an optional throwable if caused by exception.
+    * Player should not be used after destroy is called.
     *
     * @param excOpt
     */
   def destroy(excOpt: Option[Throwable]): Unit = {
-    Option(playerShape.getBody).map(_.destroy())
-    excOpt.fold(queue.complete())(queue.fail _)
+    Option(playerShape.getBody).foreach(_.destroy())
+    excOpt.fold(queue.complete())(queue.fail)
   }
 
   /**

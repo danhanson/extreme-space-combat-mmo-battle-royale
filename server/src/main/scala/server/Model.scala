@@ -1,6 +1,5 @@
 package server
 
-import scala.util.Try
 import scala.io.Source
 import scala.util.parsing.combinator._
 import scala.util.parsing.input._
@@ -22,8 +21,8 @@ object Model extends JavaTokenParsers with StrictLogging {
       parser(new CharSequenceReader(str)).map(Some(_)).getOrElse(None)
   }
 
-  def f = floatingPointNumber ^^ { _.toFloat }
-  def i = wholeNumber ^^ { _.toInt }
+  private def f = floatingPointNumber ^^ { _.toFloat }
+  private def i = wholeNumber ^^ { _.toInt }
 
   val vertex: Parser[Float ~ Float ~ Float] = 'v' ~> f ~ f ~ f <~ f.?
   val vertexRef: Parser[Int] = i <~ ("//" ~ i | "/" ~ i ~ "/" ~ i).?
@@ -60,12 +59,12 @@ object Model extends JavaTokenParsers with StrictLogging {
       source = Option(getClass.getResourceAsStream("/models/${name}.obj")).map { input =>
         Source.fromInputStream(input)
       } orElse {
-        Some(Source.fromFile(s"../models/${name}.obj"))
+        Some(Source.fromFile(s"../models/$name.obj"))
       }
       source.get
     } catch {
       case e: Exception =>
-        source.map(_.close())
+        source.foreach(_.close())
         throw e
     }
   }
