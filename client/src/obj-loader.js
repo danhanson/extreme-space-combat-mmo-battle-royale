@@ -1,3 +1,7 @@
+/**
+ * obj-loader.js provides functions for loading graphical models from the server.
+ */
+
 import * as Three from 'three'
 import OBJLoader from 'three-obj-loader'
 import MTLLoader from 'three-mtl-loader'

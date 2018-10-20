@@ -1,6 +1,6 @@
 /**
  * Binds user input to the specified web socket. Should be used for any input
- * used by the physics engine on the backend. Should not be handling
+ * used by the physics engine on the server. Should not be handling
  * interaction with ui.
  *
  * @param {WebSocket} ws
@@ -23,6 +23,12 @@ export default function bindInput (ws) {
 
   let pressedKeys = new Set()
 
+  /**
+   * Sends the input to the server where it's used for
+   * future tick calculations until the next update is
+   * sent. Sends two vectors, one for position and other
+   * for rotation.
+   */
   function sendUpdate () {
     const buffer = new ArrayBuffer(6 * 4) // 2 3d vectors
     const view = new DataView(buffer)
@@ -73,7 +79,7 @@ export default function bindInput (ws) {
     sendUpdate()
   }
   document.addEventListener('keydown', evt => {
-    if (pressedKeys.has(evt.code)) {
+    if (pressedKeys.has(evt.code)) { // filter out duplicate presses
       return
     }
     pressedKeys.add(evt.code)

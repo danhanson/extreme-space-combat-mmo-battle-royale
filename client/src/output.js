@@ -1,9 +1,7 @@
 /**
- * Stores updated date from the server sent through the specified web socket.
- * Use the methods of the returned object to receive most up-to-date game
- * information.
- *
- * @param {WebSocket} the websocket events are listened from
+ * Provides a function that returns an object containing updated data from the
+ * server received from the specified web socket. Use the methods of the returned
+ * object to receive most up-to-date game information.
  */
 import * as Three from 'three'
 import PlayerPromise from './player'
@@ -18,6 +16,11 @@ async function loadResources () {
   }
 }
 
+/**
+ * Returns the output object used to read data from the server.
+ *
+ * @param {WebSocket} the websocket events are listened from
+ */
 export default async function bindOutput (ws) {
   const entityConstructors = await loadResources()
 

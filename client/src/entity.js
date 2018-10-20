@@ -14,6 +14,13 @@ export default class Entity {
     this.rotation = rotation
   }
 
+  /**
+   * Guesses current position of the entity based on time since last tick.
+   * Uses basic linear interpolation on velocity and rotation.
+   * Doesn't seem to work so it's commented out.
+   *
+   * @param {Number} delta: time in seconds since last tick
+   */
   extrapolate (delta) {
     // this.position.add(this.velocity.clone().multiplyScalar(delta))
     // while (delta > 1) {

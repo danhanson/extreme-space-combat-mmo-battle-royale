@@ -2,7 +2,6 @@ const webpack = require('webpack')
 const path = require('path')
 const MiniCssExtractPlugin = require('mini-css-extract-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
-// const BabelMinifyPlugin = require('babel-minify-webpack-plugin')
 
 module.exports = (env, { mode = 'development' }) => {
   const plugins = [
@@ -23,9 +22,6 @@ module.exports = (env, { mode = 'development' }) => {
       chunkFilename: '[id].css'
     })
   ]
-  if (mode === 'production') {
-    plugins.push(new MiniCssExtractPlugin())
-  }
   return {
     entry: ['babel-polyfill', './src/index.js'],
     output: {
@@ -37,7 +33,15 @@ module.exports = (env, { mode = 'development' }) => {
         {
           test: /\.js$/,
           include: [path.resolve(__dirname, 'src')],
-          loader: 'babel-loader'
+          use: [
+            'babel-loader',
+            {
+              loader: 'eslint-loader',
+              options: {
+                failOnError: true
+              }
+            }
+          ]
         },
         {
           test: /\.styl$/,
@@ -59,7 +63,6 @@ module.exports = (env, { mode = 'development' }) => {
     mode,
     plugins,
     optimization: {
-      // minimizer: [ new BabelMinifyPlugin() ] breaks source maps
       splitChunks: {
         chunks: 'async',
         minSize: 30000,
