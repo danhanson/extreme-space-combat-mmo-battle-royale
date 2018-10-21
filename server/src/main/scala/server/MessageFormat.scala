@@ -24,7 +24,8 @@ object MessageFormat {
     buf.order(ByteOrder.BIG_ENDIAN)
     ClientInput(
       new DVector3(buf.getFloat, buf.getFloat, buf.getFloat),
-      new DVector3(buf.getFloat, buf.getFloat, buf.getFloat)
+      new DVector3(buf.getFloat, buf.getFloat, buf.getFloat),
+      buf.getFloat != 0f
     )
   }
 

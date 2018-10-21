@@ -18,7 +18,8 @@ export default function bindInput (ws) {
     rollRight: 0,
     rollLeft: 0,
     turnRight: 0,
-    turnLeft: 0
+    turnLeft: 0,
+    shoot: 0
   }
 
   let pressedKeys = new Set()
@@ -38,6 +39,7 @@ export default function bindInput (ws) {
     view.setFloat32(12, input.rotateUp - input.rotateDown)
     view.setFloat32(16, input.rollRight - input.rollLeft)
     view.setFloat32(20, input.turnLeft - input.turnRight)
+    view.setFloat32(24, input.shoot)
     ws.send(buffer)
   }
 
@@ -73,6 +75,9 @@ export default function bindInput (ws) {
       case 'KeyE':
         input.rollRight = val
         break
+      case 'Space':
+        input.shoot = val
+        break
       default:
         return // don't send update for garbage keys
     }
@@ -86,7 +91,9 @@ export default function bindInput (ws) {
     updateInput(evt.code, 100)
   })
   document.addEventListener('keyup', evt => {
-    pressedKeys.delete(evt.code)
-    updateInput(evt.code, 0)
+    if (pressedKeys.has(evt.code)) {
+      pressedKeys.delete(evt.code)
+      updateInput(evt.code, 0)
+    }
   })
 }
