@@ -6,6 +6,8 @@ import scala.util.parsing.input._
 import org.ode4j.ode._
 import com.typesafe.scalalogging.StrictLogging
 
+import scala.util.control.NonFatal
+
 case class Model(vertexes: Array[Float], indexes: Array[Int]) {
   def geom(): DGeom = {
     val meshData = OdeHelper.createTriMeshData()
@@ -64,7 +66,11 @@ object Model extends JavaTokenParsers with StrictLogging {
       source.get
     } catch {
       case e: Throwable =>
-        source.foreach(_.close())
+        try {
+          source.foreach(_.close())
+        } catch {
+          case NonFatal(closedExc) => e.addSuppressed(closedExc)
+        }
         throw e
     }
   }
