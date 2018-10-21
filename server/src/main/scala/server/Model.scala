@@ -63,7 +63,7 @@ object Model extends JavaTokenParsers with StrictLogging {
       }
       source.get
     } catch {
-      case e: Exception =>
+      case e: Throwable =>
         source.foreach(_.close())
         throw e
     }

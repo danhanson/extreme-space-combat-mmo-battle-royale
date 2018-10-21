@@ -4,8 +4,6 @@ import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.util.ByteString
 import org.ode4j.ode.DGeom
 
-import scala.collection.mutable
-
 case class Player(
     name: String, // unique id for each player
     var input: ClientInput, // commands provided by client
