@@ -1,4 +1,4 @@
-#Installation
+# Installation
 
 1. Install [sbt](https://www.scala-sbt.org/download.html) and [Node.js](https://nodejs.org/en/download/)
 
@@ -21,13 +21,13 @@ cd server
 sbt run
 ```
 
-#Playing
+# Gameplay
 
 By default, the server runs on [http://127.0.0.1:8080/](http://127.0.0.1:8080).
 
 Visit, then choose a game and username.
 
-#Controls
+# Controls
 
 * WASD to control direction you are facing
 * QE to rotate
